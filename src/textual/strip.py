@@ -512,7 +512,8 @@ class Strip:
         if cached_result is not None:
             return cached_result
         strip = self.extend_cell_length(end, style).crop(start, end)
-        self._crop_extend_cache[cache_key] = strip
+        if strip is not self:  # A cache holding the strip itself is a reference cycle.
+            self._crop_extend_cache[cache_key] = strip
         return strip
 
     def crop(self, start: int, end: int | None = None) -> Strip:
@@ -586,19 +587,18 @@ class Strip:
         pos = 0
         cell_length = self.cell_length
         cuts = [cut for cut in cuts if cut <= cell_length]
+        if cuts == [cell_length]:
+            # Not cached: a cache holding the strip itself is a reference cycle.
+            return [self]
         cache_key = tuple(cuts)
         if (cached := self._divide_cache.get(cache_key)) is not None:
             return cached
 
-        strips: list[Strip]
-        if cuts == [cell_length]:
-            strips = [self]
-        else:
-            strips = []
-            add_strip = strips.append
-            for segments, cut in zip(Segment.divide(self._segments, cuts), cuts):
-                add_strip(Strip(segments, cut - pos))
-                pos = cut
+        strips: list[Strip] = []
+        add_strip = strips.append
+        for segments, cut in zip(Segment.divide(self._segments, cuts), cuts):
+            add_strip(Strip(segments, cut - pos))
+            pos = cut
 
         self._divide_cache[cache_key] = strips
         return strips

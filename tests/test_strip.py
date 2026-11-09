@@ -1,3 +1,5 @@
+import gc
+
 import pytest
 from rich.console import Console
 from rich.segment import Segment
@@ -159,6 +161,38 @@ def test_divide():
         Strip([Segment("f")]),
         Strip([Segment("o")]),
     ]
+
+
+def test_divide_full_width_leaves_no_cycle():
+    """Dividing at the full width returns the strip itself without a reference cycle."""
+    gc.collect()
+    gc.disable()
+    try:
+        strip = Strip([Segment("foo")])
+        divided = strip.divide([3])
+        assert divided == [strip] and divided[0] is strip
+        del strip, divided
+        assert gc.collect() == 0
+    finally:
+        gc.enable()
+
+
+def test_crop_extend_whole_strip_leaves_no_cycle():
+    """crop_extend over the whole strip returns the strip itself without a reference cycle."""
+    gc.collect()
+    gc.disable()
+    try:
+        strip = Strip([Segment("foo")])
+        assert strip.crop_extend(0, 3, None) is strip
+        del strip
+        assert gc.collect() == 0
+    finally:
+        gc.enable()
+
+
+def test_divide_partial_is_cached():
+    strip = Strip([Segment("foo")])
+    assert strip.divide([1, 3]) is strip.divide([1, 3])
 
 
 @pytest.mark.parametrize(
