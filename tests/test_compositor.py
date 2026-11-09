@@ -1,3 +1,5 @@
+import gc
+
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
@@ -40,3 +42,25 @@ async def test_compositor_scroll_placements():
         # The static wasn't scrolled out of view, and should be visible
         # This wasn't the case <= v0.86.1
         assert static in widgets
+
+
+async def test_arrange_root_leaves_no_cycle():
+    """Arranging a screen leaves no reference cycle behind."""
+
+    class ArrangeApp(App):
+        def compose(self) -> ComposeResult:
+            with Container():
+                yield Static("one")
+                yield Static("two")
+
+    app = ArrangeApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        compositor = app.screen._compositor
+        gc.collect()
+        gc.disable()
+        try:
+            compositor._arrange_root(app.screen, app.screen.size)
+            assert gc.collect() == 0
+        finally:
+            gc.enable()

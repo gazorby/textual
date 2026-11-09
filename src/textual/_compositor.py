@@ -741,16 +741,21 @@ class Compositor:
                 )
 
         # Add top level (root) widget
-        add_widget(
-            root,
-            size.region,
-            size.region,
-            ((0, 0, 0),),
-            layer_order,
-            size.region,
-            True,
-            NULL_SPACING,
-        )
+        try:
+            add_widget(
+                root,
+                size.region,
+                size.region,
+                ((0, 0, 0),),
+                layer_order,
+                size.region,
+                True,
+                NULL_SPACING,
+            )
+        finally:
+            # add_widget references itself through its closure cell; clearing the
+            # cell breaks that cycle, which would otherwise keep `map` alive.
+            del add_widget
         widgets -= invisible_widgets
         return map, widgets
 
