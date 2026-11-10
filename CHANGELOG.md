@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- Fixed `LRUCache` ignoring updates to an existing key and retaining values until garbage collection
+- Fixed removed widgets staying in memory while registered as watchers of another node's reactive
+- Fixed quadratic time when removing many `Tree` nodes at once
+- Fixed quadratic time when removing many `DataTable` rows
+- Fixed `displayed_children` omitting invisible children after `displayed_and_visible_children` was read
+- Fixed removed widgets staying referenced by their parent's cached list of displayed children
+- Fixed removed widgets staying in memory while subscribed to a signal
+
 ## [8.2.8] - 2026-06-30
 
 ### Fixed
