@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from functools import partial
 from inspect import isawaitable
+from weakref import WeakKeyDictionary
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -177,7 +178,7 @@ class Reactive(Generic[ReactiveType]):
 
     @classmethod
     def _clear_watchers(cls, obj: Reactable) -> None:
-        """Clear any watchers on a given object.
+        """Clear watchers on `obj` and those `obj` registered on other objects.
 
         Args:
             obj: A reactive object.
@@ -186,6 +187,19 @@ class Reactive(Generic[ReactiveType]):
             getattr(obj, "__watchers").clear()
         except AttributeError:
             pass
+        watching: WeakKeyDictionary[Reactable, set[str]]
+        watching = getattr(obj, "__watching", WeakKeyDictionary())
+        for watched, attribute_names in list(watching.items()):
+            watched_watchers = getattr(watched, "__watchers", {})
+            for attribute_name in attribute_names:
+                watchers = watched_watchers.get(attribute_name)
+                if watchers:
+                    watchers[:] = [
+                        (reactable, callback)
+                        for reactable, callback in watchers
+                        if reactable is not obj
+                    ]
+        watching.clear()
 
     @property
     def owner(self) -> Type[MessageTarget]:
@@ -530,3 +544,6 @@ def _watch(
         current_value = getattr(obj, attribute_name, None)
         invoke_watcher(obj, callback, current_value, current_value)
     watcher_list.append((node, callback))
+    if not hasattr(node, "__watching"):
+        setattr(node, "__watching", WeakKeyDictionary())
+    getattr(node, "__watching").setdefault(obj, set()).add(attribute_name)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import gc
+import weakref
 
 import pytest
 
@@ -840,3 +842,74 @@ async def test_mutate_reactive_data_bind() -> None:
         assert widget_messages == [[], ["foo"]]
         assert app.messages == ["foo"]
         assert test_widget.messages == ["foo"]
+
+
+async def test_removed_widgets_drop_their_watchers() -> None:
+    """Test that removed widgets watching the app are collected and unregistered."""
+
+    class ThemeWatcher(Widget):
+        def on_mount(self) -> None:
+            self.watch(self.app, "theme", self._theme_changed, init=False)
+
+        def _theme_changed(self) -> None:
+            pass
+
+    app = App()
+    async with app.run_test() as pilot:
+        baseline = len(getattr(app, "__watchers", {}).get("theme", []))
+        refs = []
+        for _ in range(5):
+            watcher = ThemeWatcher()
+            await app.screen.mount(watcher)
+            refs.append(weakref.ref(watcher))
+            await watcher.remove()
+            del watcher
+            await pilot.pause()
+        assert (
+            app.screen.children.displayed == []
+        )  # reading it drops the stale cached snapshot
+        gc.collect()
+        assert [ref() for ref in refs] == [None] * 5
+        assert len(getattr(app, "__watchers")["theme"]) == baseline
+
+
+async def test_watcher_outlives_watched_widget() -> None:
+    """Test that removing a watcher after the widget it watched raises nothing."""
+
+    class Watched(Widget):
+        value = reactive(0)
+
+    app = App()
+    async with app.run_test():
+        watched = Watched()
+        watcher = Widget()
+        await app.screen.mount(watched, watcher)
+        watcher.watch(watched, "value", lambda: None, init=False)
+        await watched.remove()
+        await watcher.remove()
+        assert getattr(watched, "__watchers", {}) == {}
+
+
+async def test_long_lived_watcher_releases_removed_widgets() -> None:
+    """Test that a watcher keeps no record of widgets it watched once they are removed."""
+
+    class Watched(Widget):
+        value = reactive(0)
+
+    app = App()
+    async with app.run_test() as pilot:
+        watcher = Widget()
+        await app.screen.mount(watcher)
+        refs = []
+        for _ in range(5):
+            watched = Watched()
+            await app.screen.mount(watched)
+            watcher.watch(watched, "value", lambda: None, init=False)
+            refs.append(weakref.ref(watched))
+            await watched.remove()
+            del watched
+            await pilot.pause()
+        assert app.screen.children.displayed == [watcher]
+        gc.collect()
+        assert [ref() for ref in refs] == [None] * 5
+        assert len(getattr(watcher, "__watching")) == 0
