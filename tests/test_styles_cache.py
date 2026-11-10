@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import gc
+import weakref
+
 from rich.segment import Segment
 
 from textual._styles_cache import StylesCache
@@ -269,3 +272,19 @@ def test_dirty_cache() -> None:
     assert rendered_lines == [0, 1]
     text_content = _extract_content(lines)
     assert text_content == expected_text
+
+
+def test_get_inner_outer_does_not_retain_instances() -> None:
+    """Test that calling get_inner_outer does not keep StylesCache instances alive.
+
+    Regression test for https://github.com/Textualize/textual/issues/6665
+    """
+    StylesCache.get_inner_outer.cache_clear()
+    caches = [StylesCache(), StylesCache()]
+    refs = [weakref.ref(cache) for cache in caches]
+    for cache in caches:
+        cache.get_inner_outer(Color(0, 0, 0), Color(1, 2, 3))
+    assert StylesCache.get_inner_outer.cache_info().currsize == 1
+    del cache, caches
+    gc.collect()
+    assert [ref() for ref in refs] == [None, None]

@@ -254,9 +254,10 @@ class StylesCache:
 
         return strips
 
+    @staticmethod
     @lru_cache(1024)
     def get_inner_outer(
-        cls, base_background: Color, background: Color
+        base_background: Color, background: Color
     ) -> tuple[Style, Style]:
         """Get inner and outer background colors."""
         return (
