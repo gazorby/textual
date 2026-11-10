@@ -108,3 +108,15 @@ async def test_attempt_to_remove_root():
     async with TreeClearApp().run_test() as pilot:
         with pytest.raises(RemoveRootError):
             pilot.app.query_one(VerseTree).root.remove()
+
+
+async def test_remove_children_drops_whole_subtree() -> None:
+    """Test that removing root's children leaves only the root registered."""
+    async with TreeClearApp().run_test() as pilot:
+        tree = pilot.app.query_one(VerseTree)
+        for index in range(50):
+            planet = tree.root.add(f"planet {index}", VersePlanet())
+            planet.add_leaf("moon", VerseMoon())
+        tree.root.remove_children()
+        assert len(tree.root.children) == 0
+        assert tree._tree_nodes == {tree.root.id: tree.root}

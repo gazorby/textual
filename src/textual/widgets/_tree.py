@@ -476,8 +476,10 @@ class TreeNode(Generic[TreeDataType]):
             This is the internal support method for `remove_children`. Call
             `remove_children` to ensure the tree gets refreshed.
         """
-        for child in reversed(self._children):
-            child._remove()
+        for child in self._children:
+            child._remove_children()
+            del self._tree._tree_nodes[child.id]
+        self._children.clear()
 
     def _remove(self) -> None:
         """Remove the current node and all its children.
