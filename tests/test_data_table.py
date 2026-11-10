@@ -341,6 +341,72 @@ async def test_remove_row():
         assert len(table.rows) == 2
 
 
+def _table_with_rows(app: DataTableApp, keys: str) -> DataTable:
+    table = app.query_one(DataTable)
+    table.add_column("key", key="key")
+    for key in keys:
+        table.add_row(key, key=key)
+    return table
+
+
+async def test_remove_rows_in_a_loop_renumbers() -> None:
+    """Test that removing several rows leaves contiguous indexes in order."""
+    app = DataTableApp()
+    async with app.run_test():
+        table = _table_with_rows(app, "abcde")
+        for key in "bd":
+            table.remove_row(key)
+        assert [table.get_row_index(key) for key in "ace"] == [0, 1, 2]
+        assert table.get_row_at(1) == ["c"]
+
+
+async def test_remove_rows_defers_renumbering() -> None:
+    """Test that removing rows away from the cursor does not renumber on each call."""
+    app = DataTableApp()
+    async with app.run_test():
+        table = _table_with_rows(app, "abcde")
+        for key in "bcd":
+            table.remove_row(key)
+        assert table._row_index_stale
+
+
+async def test_remove_row_twice_raises() -> None:
+    """Test that removing an already removed row raises RowDoesNotExist."""
+    app = DataTableApp()
+    async with app.run_test():
+        table = _table_with_rows(app, "abc")
+        table.remove_row("b")
+        with pytest.raises(RowDoesNotExist):
+            table.remove_row("b")
+
+
+async def test_remove_last_row_under_cursor() -> None:
+    """Test that removing the row under the cursor at the end clamps to the new last row."""
+    app = DataTableApp()
+    async with app.run_test():
+        table = _table_with_rows(app, "abc")
+        table.move_cursor(row=2)
+        table.remove_row("c")
+        assert table.cursor_row == 1
+        assert table.get_row_at(table.cursor_row) == ["b"]
+
+
+@pytest.mark.parametrize("then", ["add", "sort"])
+async def test_remove_row_then_mutate(then: str) -> None:
+    """Test that add_row or sort right after removals keeps indexes contiguous."""
+    app = DataTableApp()
+    async with app.run_test():
+        table = _table_with_rows(app, "dcba")
+        table.remove_row("c")
+        if then == "add":
+            table.add_row("z", key="z")
+            expected = {"d": 0, "b": 1, "a": 2, "z": 3}
+        else:
+            table.sort("key")
+            expected = {"a": 0, "b": 1, "d": 2}
+        assert {key: table.get_row_index(key) for key in expected} == expected
+
+
 async def test_remove_row_and_update():
     """Regression test for https://github.com/Textualize/textual/issues/3470 -
     Crash when attempting to remove and update the same cell."""

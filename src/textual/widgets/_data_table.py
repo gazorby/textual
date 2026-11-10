@@ -746,8 +746,10 @@ class DataTable(ScrollView, Generic[CellType], can_focus=True):
         # given a row or column key, the index that row or column is currently
         # present at, and mean that rows and columns are location independent - they
         # can move around without requiring us to modify the underlying data.
-        self._row_locations: TwoWayDict[RowKey, int] = TwoWayDict({})
+        self._row_index: TwoWayDict[RowKey, int] = TwoWayDict({})
         """Maps row keys to row indices which represent row order."""
+        self._row_index_stale = False
+        """True when removed rows left gaps in `_row_index`."""
         self._column_locations: TwoWayDict[ColumnKey, int] = TwoWayDict({})
         """Maps column keys to column indices which represent column order."""
 
@@ -846,6 +848,25 @@ class DataTable(ScrollView, Generic[CellType], can_focus=True):
     def row_count(self) -> int:
         """The number of rows currently present in the DataTable."""
         return len(self.rows)
+
+    @property
+    def _row_locations(self) -> TwoWayDict[RowKey, int]:
+        """Maps row keys to contiguous row indices which represent row order."""
+        if self._row_index_stale:
+            index = self._row_index
+            self._row_index = TwoWayDict(
+                {
+                    row_key: new_index
+                    for new_index, row_key in enumerate(sorted(index, key=index.get))
+                }
+            )
+            self._row_index_stale = False
+        return self._row_index
+
+    @_row_locations.setter
+    def _row_locations(self, row_locations: TwoWayDict[RowKey, int]) -> None:
+        self._row_index = row_locations
+        self._row_index_stale = False
 
     @property
     def _y_offsets(self) -> list[tuple[RowKey, int]]:
@@ -1799,22 +1820,14 @@ class DataTable(ScrollView, Generic[CellType], can_focus=True):
         Raises:
             RowDoesNotExist: If the row key does not exist.
         """
-        if row_key not in self._row_locations:
+        if row_key not in self.rows:
             raise RowDoesNotExist(f"Row key {row_key!r} is not valid.")
 
         self._require_update_dimensions = True
         self.check_idle()
 
-        index_to_delete = self._row_locations.get(row_key)
-        new_row_locations = TwoWayDict({})
-        for row_location_key in self._row_locations:
-            row_index = self._row_locations.get(row_location_key)
-            if row_index > index_to_delete:
-                new_row_locations[row_location_key] = row_index - 1
-            elif row_index < index_to_delete:
-                new_row_locations[row_location_key] = row_index
-
-        self._row_locations = new_row_locations
+        del self._row_index[row_key]
+        self._row_index_stale = True
 
         # Prevent the removed cells from triggering dimension updates
         for column_key in self._data.get(row_key):
@@ -1824,7 +1837,6 @@ class DataTable(ScrollView, Generic[CellType], can_focus=True):
         del self._data[row_key]
 
         self.cursor_coordinate = self.cursor_coordinate
-        self.hover_coordinate = self.hover_coordinate
 
         self._update_count += 1
         self.refresh(layout=True)
