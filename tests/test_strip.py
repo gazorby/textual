@@ -239,3 +239,50 @@ def test_render_with_missing_style() -> None:
     """Test that render with segments that omit a style still work."""
     strip = Strip([Segment("Hello")])
     assert strip.render(Console()) == "Hello"
+
+
+_MONOCHROME = Monochrome()
+
+_CACHES = (
+    "_divide_cache",
+    "_crop_cache",
+    "_style_cache",
+    "_filter_cache",
+    "_line_length_cache",
+    "_crop_extend_cache",
+    "_offsets_cache",
+)
+
+
+def test_fresh_strip_holds_no_caches():
+    strip = Strip([Segment("foo")])
+    assert [getattr(strip, name) for name in _CACHES] == [None] * len(_CACHES)
+
+
+def test_derived_strip_holds_no_caches():
+    derived = Strip([Segment("foo")]).apply_offsets(1, 1)
+    assert [getattr(derived, name) for name in _CACHES] == [None] * len(_CACHES)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda strip: strip.divide([1, 3]),
+        lambda strip: strip.crop(1, 2),
+        lambda strip: strip.apply_style(Style(bold=True)),
+        lambda strip: strip.apply_filter(_MONOCHROME, Color(0, 0, 0)),
+        lambda strip: strip.adjust_cell_length(5),
+        lambda strip: strip.crop_extend(0, 5, None),
+        lambda strip: strip.apply_offsets(1, 1),
+    ],
+)
+def test_cached_call_returns_same_strip(call):
+    strip = Strip([Segment("foo", Style())])
+    assert call(strip) is call(strip)
+
+
+def test_cycle_paths_leave_caches_unset():
+    strip = Strip([Segment("foo")])
+    assert strip.divide([3]) == [strip]
+    assert strip.crop_extend(0, 3, None) is strip
+    assert (strip._divide_cache, strip._crop_extend_cache) == (None, None)

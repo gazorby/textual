@@ -96,19 +96,25 @@ class Strip:
     ) -> None:
         self._segments = list(segments)
         self._cell_length = cell_length
-        self._divide_cache: FIFOCache[tuple[int, ...], list[Strip]] = FIFOCache(4)
-        self._crop_cache: FIFOCache[tuple[int, int], Strip] = FIFOCache(16)
-        self._style_cache: FIFOCache[Style, Strip] = FIFOCache(16)
-        self._filter_cache: FIFOCache[tuple[LineFilter, Color], Strip] = FIFOCache(4)
-        self._line_length_cache: FIFOCache[
-            tuple[int, Style | None],
-            Strip,
-        ] = FIFOCache(4)
-        self._crop_extend_cache: FIFOCache[
-            tuple[int, int, Style | None],
-            Strip,
-        ] = FIFOCache(4)
-        self._offsets_cache: FIFOCache[tuple[int, int], Strip] = FIFOCache(4)
+        self._divide_cache: FIFOCache[tuple[int, ...], list[Strip]] | None = None
+        self._crop_cache: FIFOCache[tuple[int, int], Strip] | None = None
+        self._style_cache: FIFOCache[Style, Strip] | None = None
+        self._filter_cache: FIFOCache[tuple[LineFilter, Color], Strip] | None = None
+        self._line_length_cache: (
+            FIFOCache[
+                tuple[int, Style | None],
+                Strip,
+            ]
+            | None
+        ) = None
+        self._crop_extend_cache: (
+            FIFOCache[
+                tuple[int, int, Style | None],
+                Strip,
+            ]
+            | None
+        ) = None
+        self._offsets_cache: FIFOCache[tuple[int, int], Strip] | None = None
         self._render_cache: str | None = None
         self._link_ids: set[str] | None = None
         self._cell_count: int | None = None
@@ -371,7 +377,11 @@ class Strip:
             return self
 
         cache_key = (cell_length, style)
-        cached_strip = self._line_length_cache.get(cache_key)
+        cached_strip = (
+            None
+            if self._line_length_cache is None
+            else self._line_length_cache.get(cache_key)
+        )
         if cached_strip is not None:
             return cached_strip
 
@@ -408,6 +418,8 @@ class Strip:
             # Strip is already the required cell length, so return self.
             strip = self
 
+        if self._line_length_cache is None:
+            self._line_length_cache = FIFOCache(4)
         self._line_length_cache[cache_key] = strip
         return strip
 
@@ -460,11 +472,17 @@ class Strip:
         Returns:
             A new Strip.
         """
-        cached_strip = self._filter_cache.get((filter, background))
+        cached_strip = (
+            None
+            if self._filter_cache is None
+            else self._filter_cache.get((filter, background))
+        )
         if cached_strip is None:
             cached_strip = Strip(
                 filter.apply(self._segments, background), self._cell_length
             )
+            if self._filter_cache is None:
+                self._filter_cache = FIFOCache(4)
             self._filter_cache[(filter, background)] = cached_strip
         return cached_strip
 
@@ -508,11 +526,17 @@ class Strip:
             New cropped Strip.
         """
         cache_key = (start, end, style)
-        cached_result = self._crop_extend_cache.get(cache_key)
+        cached_result = (
+            None
+            if self._crop_extend_cache is None
+            else self._crop_extend_cache.get(cache_key)
+        )
         if cached_result is not None:
             return cached_result
         strip = self.extend_cell_length(end, style).crop(start, end)
         if strip is not self:  # A cache holding the strip itself is a reference cycle.
+            if self._crop_extend_cache is None:
+                self._crop_extend_cache = FIFOCache(4)
             self._crop_extend_cache[cache_key] = strip
         return strip
 
@@ -534,7 +558,7 @@ class Strip:
         if end <= start:
             return Strip([], 0)
         cache_key = (start, end)
-        cached = self._crop_cache.get(cache_key)
+        cached = None if self._crop_cache is None else self._crop_cache.get(cache_key)
         if cached is not None:
             return cached
         _cell_len = cell_len
@@ -571,6 +595,8 @@ class Strip:
                     pos = end_pos
                     segment = next(iter_segments, None)
                 strip = Strip(output_segments, end - start)
+        if self._crop_cache is None:
+            self._crop_cache = FIFOCache(16)
         self._crop_cache[cache_key] = strip
         return strip
 
@@ -591,7 +617,10 @@ class Strip:
             # Not cached: a cache holding the strip itself is a reference cycle.
             return [self]
         cache_key = tuple(cuts)
-        if (cached := self._divide_cache.get(cache_key)) is not None:
+        cached = (
+            None if self._divide_cache is None else self._divide_cache.get(cache_key)
+        )
+        if cached is not None:
             return cached
 
         strips: list[Strip] = []
@@ -600,6 +629,8 @@ class Strip:
             add_strip(Strip(segments, cut - pos))
             pos = cut
 
+        if self._divide_cache is None:
+            self._divide_cache = FIFOCache(4)
         self._divide_cache[cache_key] = strips
         return strips
 
@@ -612,12 +643,14 @@ class Strip:
         Returns:
             A new strip.
         """
-        cached = self._style_cache.get(style)
+        cached = None if self._style_cache is None else self._style_cache.get(style)
         if cached is not None:
             return cached
         styled_strip = Strip(
             Segment.apply_style(self._segments, style), self.cell_length
         )
+        if self._style_cache is None:
+            self._style_cache = FIFOCache(16)
         self._style_cache[style] = styled_strip
         return styled_strip
 
@@ -800,7 +833,10 @@ class Strip:
             New strip.
         """
         cache_key = (x, y)
-        if (cached_strip := self._offsets_cache.get(cache_key)) is not None:
+        cached_strip = (
+            None if self._offsets_cache is None else self._offsets_cache.get(cache_key)
+        )
+        if cached_strip is not None:
             return cached_strip
         segments = self._segments
         strip_segments: list[Segment] = []
@@ -813,5 +849,7 @@ class Strip:
             x += len(segment.text)
         strip = Strip(strip_segments, self._cell_length)
         strip._render_cache = self._render_cache
+        if self._offsets_cache is None:
+            self._offsets_cache = FIFOCache(4)
         self._offsets_cache[cache_key] = strip
         return strip
