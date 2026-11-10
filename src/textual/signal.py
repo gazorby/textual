@@ -8,7 +8,7 @@ DOMNodes can subscribe to a signal, which will invoke a callback when the signal
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Generic, TypeVar, Union
-from weakref import WeakKeyDictionary, ref
+from weakref import WeakKeyDictionary, WeakSet, ref
 
 import rich.repr
 
@@ -16,6 +16,7 @@ from textual import log
 
 if TYPE_CHECKING:
     from textual.dom import DOMNode
+    from textual.message_pump import MessagePump
 
 SignalT = TypeVar("SignalT")
 
@@ -93,6 +94,9 @@ class Signal(Generic[SignalT]):
 
         callbacks = self._subscriptions.setdefault(node, [])
         callbacks.append(signal_callback)
+        if not hasattr(node, "__signals"):
+            setattr(node, "__signals", WeakSet())
+        getattr(node, "__signals").add(self)
 
     def unsubscribe(self, node: DOMNode) -> None:
         """Unsubscribe a node from this signal.
@@ -101,6 +105,14 @@ class Signal(Generic[SignalT]):
             node: Node to unsubscribe,
         """
         self._subscriptions.pop(node, None)
+
+    @classmethod
+    def _unsubscribe_all(cls, node: MessagePump) -> None:
+        """Unsubscribe `node` from every signal it subscribed to."""
+        signals: WeakSet[Signal[Any]] = getattr(node, "__signals", WeakSet())
+        for signal in list(signals):
+            signal.unsubscribe(node)
+        signals.clear()
 
     def publish(self, data: SignalT) -> None:
         """Publish the signal (invoke subscribed callbacks).

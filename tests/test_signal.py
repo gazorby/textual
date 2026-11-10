@@ -1,3 +1,6 @@
+import gc
+import weakref
+
 import pytest
 
 from textual.app import App, ComposeResult
@@ -108,3 +111,48 @@ async def test_signal_parameters():
         await pilot.press("space")
         assert str_result == "foo"
         assert int_result == 3
+
+
+async def test_removed_subscriber_is_unsubscribed() -> None:
+    """Test that removing a subscribed widget unsubscribes it and frees it."""
+
+    class TestApp(App):
+        def __init__(self) -> None:
+            self.test_signal: Signal[str] = Signal(self, "test")
+            super().__init__()
+
+    app = TestApp()
+    async with app.run_test() as pilot:
+        label = Label()
+        await app.mount(label)
+        app.test_signal.subscribe(label, lambda _: None)
+        app.test_signal.subscribe(label, lambda _: None, immediate=True)
+        ref = weakref.ref(label)
+        await label.remove()
+        del label
+        await pilot.pause()
+        gc.collect()
+        assert ref() is None
+        assert len(app.test_signal._subscriptions) == 0
+
+
+async def test_subscriber_outlives_signal_owner() -> None:
+    """Test that removing a subscriber after the signal's owner raises nothing."""
+
+    class Owner(Label):
+        def on_mount(self) -> None:
+            self.signal: Signal[str] = Signal(self, "owned")
+
+    app = App()
+    async with app.run_test() as pilot:
+        owner = Owner()
+        subscriber = Label()
+        await app.mount(owner, subscriber)
+        owner.signal.subscribe(subscriber, lambda _: None)
+        ref = weakref.ref(subscriber)
+        await owner.remove()
+        await subscriber.remove()
+        del subscriber
+        await pilot.pause()
+        gc.collect()
+        assert ref() is None

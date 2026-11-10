@@ -1,6 +1,11 @@
+from __future__ import annotations
+
+import gc
+import weakref
+
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
-from textual.widgets import Button, Label, Static
+from textual.widgets import Button, Label, Static, TextArea
 
 
 async def test_remove_single_widget():
@@ -225,3 +230,19 @@ async def test_widget_remove_children_no_children_match_selector():
 
         assert count_before == len(app.query("*"))
         assert container_children_before == list(container.children)
+
+
+async def test_removed_text_areas_are_freed() -> None:
+    """Test that mounting and removing TextAreas leaves none alive."""
+    app = App()
+    async with app.run_test() as pilot:
+        refs = []
+        for _ in range(5):
+            text_area = TextArea()
+            await app.screen.mount(text_area)
+            refs.append(weakref.ref(text_area))
+            await text_area.remove()
+            del text_area
+            await pilot.pause()
+        gc.collect()
+        assert [ref() for ref in refs] == [None] * 5

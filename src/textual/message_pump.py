@@ -578,6 +578,7 @@ class MessagePump(metaclass=_MessagePumpMeta):
                         await Timer._stop_all(self._timers)
                         self._timers.clear()
                     Reactive._clear_watchers(self)
+                    Signal._unsubscribe_all(self)
                 finally:
                     await self._message_loop_exit()
         self._task = None
