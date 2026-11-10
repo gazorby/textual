@@ -1,5 +1,8 @@
 from __future__ import annotations, unicode_literals
 
+import gc
+import weakref
+
 import pytest
 
 from textual.cache import FIFOCache, LRUCache
@@ -285,3 +288,44 @@ def test_discard_regression():
     cache.discard(3)
 
     assert cache.keys() == set()
+
+
+def test_lru_cache_set_existing_key_updates_value() -> None:
+    """Test that setting an existing key replaces its value."""
+    cache: LRUCache[str, int] = LRUCache(4)
+    cache["a"] = 1
+    cache["a"] = 2
+    assert cache["a"] == 2
+    assert len(cache) == 1
+
+
+def test_lru_cache_none_value_is_a_hit() -> None:
+    """Test that a stored None is returned instead of the default."""
+    cache: LRUCache[str, None] = LRUCache(4)
+    cache["a"] = None
+    assert cache.get("a", "default") is None
+    assert (cache.hits, cache.misses) == (1, 0)
+
+
+@pytest.mark.parametrize("drop", ["clear", "del"])
+def test_lru_cache_frees_values_without_gc(drop: str) -> None:
+    """Test that values are freed by refcount alone after clear() or del."""
+
+    class Value:
+        pass
+
+    gc.disable()
+    try:
+        cache: LRUCache[str, Value] = LRUCache(4)
+        value = Value()
+        ref = weakref.ref(value)
+        cache["x"] = value
+        cache["y"] = Value()
+        del value
+        if drop == "clear":
+            cache.clear()
+        else:
+            del cache
+        assert ref() is None
+    finally:
+        gc.enable()
