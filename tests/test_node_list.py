@@ -1,7 +1,13 @@
+import gc
+import weakref
+
 import pytest
 
 from textual._node_list import NodeList
+from textual.app import App, ComposeResult
+from textual.containers import Vertical
 from textual.widget import Widget
+from textual.widgets import Static
 
 
 def test_empty_list():
@@ -111,3 +117,47 @@ async def test_listy():
     assert nodes[0] == widget1
     assert nodes[1] == widget2
     assert nodes[0:2] == [widget1, widget2]
+
+
+def test_displayed_unchanged_by_displayed_and_visible() -> None:
+    """Test that reading displayed_and_visible leaves displayed intact."""
+    nodes = NodeList()
+    shown, hidden = Widget(), Widget()
+    hidden.styles.visibility = "hidden"
+    nodes._append(shown)
+    nodes._append(hidden)
+    assert list(nodes.displayed_and_visible) == [shown]
+    assert list(nodes.displayed) == [shown, hidden]
+
+
+def test_removed_node_leaves_displayed_snapshot() -> None:
+    """Test that removing a node drops it from the cached displayed snapshot."""
+    nodes = NodeList()
+    widget = Widget()
+    nodes._append(widget)
+    assert list(nodes.displayed) == [widget]
+    ref = weakref.ref(widget)
+    nodes._remove(widget)
+    del widget
+    gc.collect()
+    assert ref() is None
+
+
+async def test_display_toggle_invalidates_displayed() -> None:
+    """Test that hiding a child after displayed was read removes it from displayed."""
+
+    class DisplayApp(App[None]):
+        def compose(self) -> ComposeResult:
+            with Vertical():
+                yield Static(id="first")
+                yield Static(id="second")
+
+    app = DisplayApp()
+    async with app.run_test():
+        container = app.query_one(Vertical)
+        assert [child.id for child in container.displayed_children] == [
+            "first",
+            "second",
+        ]
+        app.query_one("#second").display = False
+        assert [child.id for child in container.displayed_children] == ["first"]

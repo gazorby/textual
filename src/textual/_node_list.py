@@ -46,7 +46,6 @@ class NodeList(Sequence["Widget"]):
         self._nodes: list[Widget] = []
         self._nodes_set: set[Widget] = set()
         self._displayed_nodes: tuple[int, list[Widget]] = (-1, [])
-        self._displayed_visible_nodes: tuple[int, list[Widget]] = (-1, [])
 
         # We cache widgets by their IDs too for a quick lookup
         # Note that only widgets with IDs are cached like this, so
@@ -74,6 +73,7 @@ class NodeList(Sequence["Widget"]):
     def updated(self) -> None:
         """Mark the nodes as having been updated."""
         self._updates += 1
+        self._displayed_nodes = (-1, [])
         node = None if self._parent is None else self._parent()
         while node is not None and (node := node._parent) is not None:
             node._nodes._updates += 1
@@ -203,12 +203,7 @@ class NodeList(Sequence["Widget"]):
     @property
     def displayed_and_visible(self) -> Sequence[Widget]:
         """Nodes with both `display==True` and `visible==True`."""
-        if self._displayed_visible_nodes[0] != self._updates:
-            self._displayed_nodes = (
-                self._updates,
-                list(filter(_visible_getter, self.displayed)),
-            )
-        return self._displayed_nodes[1]
+        return list(filter(_visible_getter, self.displayed))
 
     @property
     def displayed_reverse(self) -> Iterator[Widget]:
