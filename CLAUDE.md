@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Fork goal
+
+This fork exists to improve Textual's performance, both latency and memory usage, while keeping the public API 100% compatible with upstream. Changes may touch private modules (`_`-prefixed) and internals freely, but must not add, remove, rename or change the behaviour of anything public.
+
 ## Commands
 
 Poetry is the canonical toolchain (Makefile and CI use it; `uv.lock` also exists but is not used by CI).
