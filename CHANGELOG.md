@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- `RenderStyles`, `Signal`, `BindingsMap` and `NodeList` use `__slots__` to reduce memory, so they no longer accept arbitrary attributes; `Styles` does the same on Python 3.14+
+
 ### Fixed
 
 - Fixed `LRUCache` ignoring updates to an existing key and retaining values until garbage collection
