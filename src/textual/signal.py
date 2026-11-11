@@ -33,6 +33,8 @@ class SignalError(Exception):
 class Signal(Generic[SignalT]):
     """A signal that a widget may subscribe to, in order to invoke callbacks when an associated event occurs."""
 
+    __slots__ = ("__weakref__", "_name", "_owner", "_subscriptions")
+
     def __init__(self, owner: DOMNode, name: str) -> None:
         """Initialize a signal.
 
