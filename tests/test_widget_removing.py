@@ -246,3 +246,21 @@ async def test_removed_text_areas_are_freed() -> None:
             await pilot.pause()
         gc.collect()
         assert [ref() for ref in refs] == [None] * 5
+
+
+async def test_removed_child_is_freed_by_mounted_parent() -> None:
+    """Test that a removed child is not kept alive by its parent's cached arrangements."""
+    app = App()
+    async with app.run_test() as pilot:
+        container = Vertical()
+        await app.screen.mount(container)
+        child = Static("child")
+        await container.mount(child)
+        await pilot.pause()
+        ref = weakref.ref(child)
+        await child.remove()
+        del child
+        await pilot.pause()
+        gc.collect()
+        assert container.is_attached
+        assert ref() is None

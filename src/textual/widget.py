@@ -4529,6 +4529,9 @@ class Widget(DOMNode):
         self.app._registry.discard(self)
         self._detach()
         self._arrangement_cache.clear()
+        if isinstance(parent, Widget):
+            # Stale arrangements of the parent would keep this widget alive
+            parent._clear_arrangement_cache()
         self._nodes._clear()
         self._render_cache = _RenderCache(NULL_SIZE, [])
         self._component_styles.clear()
