@@ -11,6 +11,7 @@ from rich.style import Style
 from typing_extensions import TypedDict
 
 from textual._animator import DEFAULT_EASING, Animatable, BoundAnimator, EasingFunction
+from textual._compat import DATACLASS_SLOTS
 from textual._types import AnimationLevel, CallbackType
 from textual.color import Color
 from textual.css._style_properties import (
@@ -222,6 +223,8 @@ _rule_getter = attrgetter(*RULE_NAMES)
 
 class StylesBase:
     """A common base class for Styles and RenderStyles"""
+
+    __slots__ = ()
 
     ANIMATABLE = {
         "offset",
@@ -881,9 +884,13 @@ class StylesBase:
         return style
 
 
+class _StylesRuleAccess(StylesBase):
+    __slots__ = ("get_rule", "has_rule") if DATACLASS_SLOTS else ()
+
+
 @rich.repr.auto
-@dataclass
-class Styles(StylesBase):
+@dataclass(**DATACLASS_SLOTS)
+class Styles(_StylesRuleAccess):
     node: DOMNode | None = None
     _rules: RulesMap = field(default_factory=RulesMap)
     _updates: int = 0
@@ -1333,6 +1340,17 @@ class Styles(StylesBase):
 @rich.repr.auto
 class RenderStyles(StylesBase):
     """Presents a combined view of two Styles object: a base Styles and inline Styles."""
+
+    __slots__ = (
+        "__weakref__",
+        "_animate",
+        "_base_styles",
+        "_gutter",
+        "_inline_styles",
+        "_node",
+        "_rich_style",
+        "_updates",
+    )
 
     def __init__(self, node: DOMNode, base: Styles, inline_styles: Styles) -> None:
         self._node = weakref.ref(node)

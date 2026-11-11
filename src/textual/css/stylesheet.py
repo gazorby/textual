@@ -5,7 +5,7 @@ from collections import defaultdict
 from itertools import chain
 from operator import itemgetter
 from pathlib import Path, PurePath
-from typing import Final, Iterable, NamedTuple, Sequence, cast
+from typing import ClassVar, Final, Iterable, NamedTuple, Sequence, cast
 
 import rich.repr
 from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
@@ -141,6 +141,8 @@ class CssSource(NamedTuple):
 @rich.repr.auto(angular=True)
 class Stylesheet:
     """A Stylesheet generated from Textual CSS."""
+
+    _STYLES_ATTRIBUTES: ClassVar[frozenset[str]] = frozenset(dir(Styles))
 
     def __init__(self, *, variables: dict[str, str] | None = None) -> None:
         self._rules: list[RuleSet] = []
@@ -648,8 +650,10 @@ class Stylesheet:
         styles = node.styles
         base_styles = styles.base
 
-        # Styles currently used on new rules
-        modified_rule_keys = base_styles._rules.keys() | rules.keys()
+        # Styles currently used on new rules; keys with no Styles attribute (e.g. `auto_background`) are never read
+        modified_rule_keys = (
+            base_styles._rules.keys() | rules.keys()
+        ) & cls._STYLES_ATTRIBUTES
 
         if animate:
             new_styles = Styles(node, rules)

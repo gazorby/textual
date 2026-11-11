@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import dataclasses
+import weakref
 from decimal import Decimal
 
 import pytest
@@ -17,6 +21,27 @@ def test_styles_reset():
     assert styles.text_style == Style(bold=False)
     styles.reset()
     assert styles.text_style is Style.null()
+
+
+def test_styles_copy_replace_and_weakref():
+    """Test that copied and replaced Styles keep working rule access and Styles stay weakly referenceable."""
+    styles = Styles()
+    styles.text_style = "bold"
+    copied = styles.copy()
+    replaced = dataclasses.replace(styles, important={"color"})
+    copied.text_style = None
+    assert styles.has_rule("text_style")
+    assert not copied.has_rule("text_style")
+    assert replaced.get_rule("text_style") == styles.get_rule("text_style")
+    assert replaced.important == {"color"}
+    assert weakref.ref(styles)() is styles
+
+
+def test_styles_repr():
+    """Test that Styles repr lists only the rules that are set."""
+    styles = Styles()
+    styles.text_style = "bold"
+    assert repr(styles) == "Styles(text_style=Style(bold=True))"
 
 
 def test_has_rule():

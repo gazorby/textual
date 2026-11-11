@@ -3,6 +3,11 @@ from __future__ import annotations
 import sys
 from typing import Any, Generic, TypeVar, overload
 
+# Below 3.14, a frozen slotted dataclass breaks attribute assignment in plain subclasses.
+DATACLASS_SLOTS: dict[str, bool] = (
+    {"slots": True, "weakref_slot": True} if sys.version_info >= (3, 14) else {}
+)
+
 if sys.version_info >= (3, 12):
     from functools import cached_property
 else:
