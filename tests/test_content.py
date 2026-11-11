@@ -587,3 +587,10 @@ def test_blank_method(
     assert blank.plain == text
     assert blank.spans == spans
     assert blank.cell_length == cell_length
+
+
+def test_divide_shares_equal_spans() -> None:
+    content = Content("def a\ndef b\n").stylize("bold", 0, 3).stylize("bold", 6, 9)
+    first, second, _ = content.split("\n", allow_blank=True)
+    assert first.spans == second.spans == [Span(0, 3, "bold")]
+    assert first.spans[0] is second.spans[0]

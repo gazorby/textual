@@ -1533,6 +1533,8 @@ class Content(Visual):
 
         _line_appends = [line._spans.append for line in new_lines]
         _Span = Span
+        # Pool equal spans so lines share one object instead of one each
+        pool: dict[tuple[int, int, Style | str], Span] = {}
 
         for (
             (span_start, span_end, style),
@@ -1544,7 +1546,11 @@ class Content(Visual):
                 new_start = max(0, span_start - line_start)
                 new_end = min(span_end - line_start, line_end - line_start)
                 if new_end > new_start:
-                    _line_appends[line_no](_Span(new_start, new_end, style))
+                    key = (new_start, new_end, style)
+                    span = pool.get(key)
+                    if span is None:
+                        span = pool[key] = _Span(new_start, new_end, style)
+                    _line_appends[line_no](span)
 
         return new_lines
 
