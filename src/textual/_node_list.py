@@ -34,6 +34,16 @@ class NodeList(Sequence["Widget"]):
     Although named a list, widgets may appear only once, making them more like a set.
     """
 
+    __slots__ = (
+        "__weakref__",
+        "_displayed_nodes",
+        "_nodes",
+        "_nodes_by_id",
+        "_nodes_set",
+        "_parent",
+        "_updates",
+    )
+
     def __init__(self, parent: DOMNode | None = None) -> None:
         """Initialize a node list.
 
