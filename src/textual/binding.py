@@ -185,6 +185,8 @@ class ActiveBinding(NamedTuple):
 class BindingsMap:
     """Manage a set of bindings."""
 
+    __slots__ = ("__weakref__", "key_to_bindings")
+
     def __init__(
         self,
         bindings: Iterable[BindingType] | None = None,
