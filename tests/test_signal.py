@@ -4,6 +4,7 @@ import weakref
 import pytest
 
 from textual.app import App, ComposeResult
+from textual.message import Message
 from textual.signal import Signal, SignalError
 from textual.widgets import Label
 
@@ -156,3 +157,30 @@ async def test_subscriber_outlives_signal_owner() -> None:
         await pilot.pause()
         gc.collect()
         assert ref() is None
+
+
+async def test_message_signal_late_subscriber() -> None:
+    """Test that a subscriber added after a widget processed messages receives later ones."""
+    class Ping(Message):
+        pass
+
+    received: list[Message] = []
+
+    class SignalApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Label("ping")
+
+    app = SignalApp()
+    async with app.run_test() as pilot:
+        label = app.query_one(Label)
+        await pilot.pause()
+        label.message_signal.subscribe(app.screen, received.append, immediate=True)
+        label.post_message(Ping())
+        await pilot.pause()
+        assert any(isinstance(message, Ping) for message in received)
+
+
+async def test_message_signal_is_stable() -> None:
+    """Test that message_signal returns the same object on every read."""
+    label = Label()
+    assert label.message_signal is label.message_signal

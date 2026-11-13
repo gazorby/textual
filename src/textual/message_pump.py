@@ -136,12 +136,21 @@ class MessagePump(metaclass=_MessagePumpMeta):
         self._next_callbacks: list[events.Callback] = []
         self._thread_id: int = threading.get_ident()
         self._prevented_messages_on_mount = self._prevent_message_types_stack[-1]
-        self.message_signal: Signal[Message] = Signal(self, "messages")
+        self._message_signal: Signal[Message] | None = None
+
+    @property
+    def message_signal(self) -> Signal[Message]:
         """Subscribe to this signal to be notified of all messages sent to this widget.
-        
+
         This is a fairly low-level mechanism, and shouldn't replace regular message handling.
-        
         """
+        if self._message_signal is None:
+            self._message_signal = Signal(self, "messages")
+        return self._message_signal
+
+    @message_signal.setter
+    def message_signal(self, signal: Signal[Message]) -> None:
+        self._message_signal = signal
 
     @property
     def _parent(self) -> MessagePump | None:
@@ -681,7 +690,8 @@ class MessagePump(metaclass=_MessagePumpMeta):
                 self.app._handle_exception(error)
                 break
             finally:
-                self.message_signal.publish(message)
+                if self._message_signal is not None:
+                    self._message_signal.publish(message)
                 self._message_queue.task_done()
 
                 current_time = time()
