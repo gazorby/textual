@@ -116,6 +116,11 @@ textual-dev = "^1.7.0"
 types-setuptools = "^67.2.0.1"
 isort = "^5.13.2"
 pytest-textual-snapshot = "^1.0.0"
+slotscheck = {version = "^0.21.0", python = ">=3.10"}
+
+[tool.slotscheck]
+require-superclass = false
+exclude-modules = '^textual\.(_sleep|drivers\.(win32|windows_driver))$'
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

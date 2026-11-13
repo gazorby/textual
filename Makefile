@@ -24,6 +24,10 @@ coverage:
 typecheck:
 	$(run) mypy src/textual
 
+.PHONY: slotscheck
+slotscheck:
+	$(run) slotscheck -m textual
+
 .PHONY: format
 format:
 	$(run) black src
