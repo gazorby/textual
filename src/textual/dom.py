@@ -168,6 +168,7 @@ class DOMNode(MessagePump):
 
     # List of names of base classes that inherit CSS
     _css_type_names: ClassVar[frozenset[str]] = frozenset()
+    _css_types: ClassVar[frozenset[str]] = frozenset({"DOMNode"})
 
     # Name of the widget in CSS
     _css_type_name: str = ""
@@ -214,7 +215,6 @@ class DOMNode(MessagePump):
 
         self._auto_refresh: float | None = None
         self._auto_refresh_timer: Timer | None = None
-        self._css_types = {cls.__name__ for cls in self._css_bases(self.__class__)}
         self._bindings = (
             BindingsMap()
             if self._merged_bindings is None
@@ -590,6 +590,7 @@ class DOMNode(MessagePump):
             css_type_names.add(base.__name__)
         cls._merged_bindings = cls._merge_bindings()
         cls._css_type_names = frozenset(css_type_names)
+        cls._css_types = cls._css_type_names
         cls._computes = frozenset(
             [
                 name.lstrip("_")[8:]
@@ -1952,3 +1953,4 @@ class DOMNode(MessagePump):
         """
         value = getattr(self, attribute_name)
         setattr(self, attribute_name, not value)
+

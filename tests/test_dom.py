@@ -2,6 +2,8 @@ import pytest
 
 from textual.css.errors import StyleValueError
 from textual.dom import BadIdentifier, DOMNode
+from textual.widget import Widget
+from textual.widgets import Static
 
 
 def test_display_default():
@@ -280,3 +282,21 @@ def test_id_validation(identifier: str):
     """Regression tests for https://github.com/Textualize/textual/issues/3954."""
     with pytest.raises(BadIdentifier):
         DOMNode(id=identifier)
+
+
+class _NoInheritWidget(Static, inherit_css=False):
+    pass
+
+
+@pytest.mark.parametrize(
+    ("node_type", "expected"),
+    [
+        (DOMNode, {"*", "DOMNode"}),
+        (Widget, {"*", "DOMNode", "Widget"}),
+        (Static, {"*", "DOMNode", "Static", "Widget"}),
+        (_NoInheritWidget, {"*", "_NoInheritWidget"}),
+    ],
+)
+def test_selector_names_by_type(node_type: type[DOMNode], expected: set[str]) -> None:
+    """Test that a node's selector names hold its CSS type names, including plain DOMNode."""
+    assert node_type()._selector_names == expected
