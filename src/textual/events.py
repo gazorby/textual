@@ -727,7 +727,7 @@ class Timer(Event, bubble=False, verbose=True):
     - [X] Verbose
     """
 
-    __slots__ = ["timer", "time", "count", "callback"]
+    __slots__ = ["timer", "count", "callback"]
 
     def __init__(
         self,
