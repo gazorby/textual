@@ -4535,7 +4535,8 @@ class Widget(DOMNode):
         self._nodes._clear()
         self._render_cache = _RenderCache(NULL_SIZE, [])
         self._component_styles.clear()
-        self._query_one_cache.clear()
+        if self._query_one_cache is not None:
+            self._query_one_cache.clear()
 
     async def _on_idle(self, event: events.Idle) -> None:
         """Called when there are no more events on the queue.

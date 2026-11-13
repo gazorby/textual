@@ -402,3 +402,19 @@ async def test_query_one_optional():
         with pytest.raises(WrongType):
             # Asking for a Label, but the widget is an Input
             app.query_one_optional("#foo", Label)
+
+
+async def test_query_one_id_after_remove_and_remount() -> None:
+    """Test that query_one by id finds a child of a container mounted after another was removed."""
+
+    class QueryApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Container(id="old")
+
+    app = QueryApp()
+    async with app.run_test():
+        await app.query_one("#old").remove()
+        child = Label(id="child")
+        container = Container(child)
+        await app.mount(container)
+        assert container.query_one("#child") is child

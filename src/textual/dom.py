@@ -230,7 +230,7 @@ class DOMNode(MessagePump):
             dict[str, tuple[MessagePump, Reactive[object] | object]] | None
         ) = None
         self._pruning = False
-        self._query_one_cache: LRUCache[QueryOneCacheKey, DOMNode] = LRUCache(1024)
+        self._query_one_cache: LRUCache[QueryOneCacheKey, DOMNode] | None = None
         self._trap_focus = False
 
         super().__init__()
@@ -1446,6 +1446,16 @@ class DOMNode(MessagePump):
         else:
             return DOMQuery[QueryType](node, deep=False, filter=selector.__name__)
 
+    def _get_cached_query_one(self, cache_key: QueryOneCacheKey) -> DOMNode | None:
+        if self._query_one_cache is None:
+            return None
+        return self._query_one_cache.get(cache_key)
+
+    def _cache_query_one(self, cache_key: QueryOneCacheKey, node: DOMNode) -> None:
+        if self._query_one_cache is None:
+            self._query_one_cache = LRUCache(1024)
+        self._query_one_cache[cache_key] = node
+
     if TYPE_CHECKING:
 
         @overload
@@ -1488,7 +1498,7 @@ class DOMNode(MessagePump):
 
         if is_id_selector(query_selector):
             cache_key = (base_node._nodes._updates, query_selector, expect_type)
-            cached_result = base_node._query_one_cache.get(cache_key)
+            cached_result = base_node._get_cached_query_one(cache_key)
             if cached_result is not None:
                 return cached_result
             if (
@@ -1500,7 +1510,7 @@ class DOMNode(MessagePump):
                     raise WrongType(
                         f"Node matching {query_selector!r} is the wrong type; expected type {expect_type.__name__!r}, found {node}"
                     )
-                base_node._query_one_cache[cache_key] = node
+                base_node._cache_query_one(cache_key, node)
                 return node
             raise NoMatches(f"No nodes match {query_selector!r} on {base_node!r}")
 
@@ -1513,7 +1523,7 @@ class DOMNode(MessagePump):
 
         if all(selectors.is_simple for selectors in selector_set):
             cache_key = (base_node._nodes._updates, query_selector, expect_type)
-            cached_result = base_node._query_one_cache.get(cache_key)
+            cached_result = base_node._get_cached_query_one(cache_key)
             if cached_result is not None:
                 return cached_result
         else:
@@ -1527,7 +1537,7 @@ class DOMNode(MessagePump):
                     f"Node matching {query_selector!r} is the wrong type; expected type {expect_type.__name__!r}, found {node}"
                 )
             if cache_key is not None:
-                base_node._query_one_cache[cache_key] = node
+                base_node._cache_query_one(cache_key, node)
             return node
 
         raise NoMatches(f"No nodes match {query_selector!r} on {base_node!r}")
@@ -1623,7 +1633,7 @@ class DOMNode(MessagePump):
 
         if all(selectors.is_simple for selectors in selector_set):
             cache_key = (base_node._nodes._updates, query_selector, expect_type)
-            cached_result = base_node._query_one_cache.get(cache_key)
+            cached_result = base_node._get_cached_query_one(cache_key)
             if cached_result is not None:
                 return cached_result
         else:
@@ -1644,7 +1654,7 @@ class DOMNode(MessagePump):
                         "Call to query_one resulted in more than one matched node"
                     )
             if cache_key is not None:
-                base_node._query_one_cache[cache_key] = node
+                base_node._cache_query_one(cache_key, node)
             return node
 
         raise NoMatches(f"No nodes match {query_selector!r} on {base_node!r}")
