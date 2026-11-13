@@ -1954,3 +1954,28 @@ class DOMNode(MessagePump):
         value = getattr(self, attribute_name)
         setattr(self, attribute_name, not value)
 
+
+class _ComponentNode(DOMNode):
+    """A detached node that only resolves the styles of one component class."""
+
+    def __init__(self, classes: str) -> None:
+        self._classes = set(classes.split())
+        self._name = None
+        self._id = None
+        self._parent = None
+        self._is_mounted = False
+        self._css_styles = Styles(self)
+        self._inline_styles = Styles(self)
+        self.styles = RenderStyles(self, self._css_styles, self._inline_styles)
+        self._nodes = NodeList(self)
+        self._message_signal = None
+        self._timers = None
+        self._disabled_messages = None
+        self._query_one_cache = None
+
+
+# Selectors must see a plain DOMNode, not the private subclass.
+_ComponentNode._css_type_name = DOMNode._css_type_name
+_ComponentNode._css_type_names = DOMNode._css_type_names
+_ComponentNode._merged_bindings = DOMNode._merged_bindings
+_ComponentNode._css_types = DOMNode._css_types

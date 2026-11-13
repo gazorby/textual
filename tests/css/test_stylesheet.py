@@ -2,6 +2,7 @@ from contextlib import nullcontext as does_not_raise
 
 import pytest
 
+from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.css.stylesheet import CssSource, Stylesheet, StylesheetParseError
 from textual.css.tokenizer import TokenError
@@ -293,3 +294,81 @@ def test_did_you_mean_for_color_names(
         expected_error_summary += f". Did you mean '{expected_color_suggestion}'?"
 
     assert help_text.summary == expected_error_summary
+
+
+class _ComponentWidget(Widget, can_focus=True):
+    COMPONENT_CLASSES = {"my--part"}
+
+
+class _ComponentApp(App[None]):
+    AUTO_FOCUS = None
+
+    CSS = """
+    _ComponentWidget { background: red; }
+    _ComponentWidget > .my--part { color: blue; }
+    _ComponentWidget:focus > .my--part { color: green; }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield _ComponentWidget()
+
+
+async def test_component_style_inherits_widget_background() -> None:
+    """Test that a component rich style combines its own color with the widget's background."""
+    app = _ComponentApp()
+    async with app.run_test():
+        widget = app.query_one(_ComponentWidget)
+        style = widget.get_component_rich_style("my--part")
+        assert (style.color, style.bgcolor) == (
+            Color.parse("blue").rich_color,
+            Color.parse("red").rich_color,
+        )
+
+
+async def test_component_style_follows_pseudo_class_ancestor() -> None:
+    """Test that focusing the widget switches the component rule to its :focus variant."""
+    app = _ComponentApp()
+    async with app.run_test() as pilot:
+        widget = app.query_one(_ComponentWidget)
+        widget.focus()
+        await pilot.pause()
+        assert widget.get_component_styles("my--part").color == Color.parse("green")
+
+
+async def test_component_style_survives_css_update() -> None:
+    """Test that adding CSS at runtime rebuilds component styles with the new rule."""
+    app = _ComponentApp()
+    async with app.run_test() as pilot:
+        widget = app.query_one(_ComponentWidget)
+        app.stylesheet.add_source(
+            "_ComponentWidget > .my--part { color: yellow; }",
+            read_from=("runtime.tcss", ""),
+        )
+        app.stylesheet.reparse()
+        app.stylesheet.update(app.screen)
+        await pilot.pause()
+        assert widget.get_component_styles("my--part").color == Color.parse("yellow")
+
+
+async def test_component_display_rule_applies() -> None:
+    """Test that a display rule matching component nodes, globally or by class, applies without error."""
+
+    class DisplayApp(_ComponentApp):
+        CSS = _ComponentApp.CSS + """
+        * { display: block; }
+        _ComponentWidget > .my--part { display: none; }
+        """
+
+    app = DisplayApp()
+    async with app.run_test():
+        widget = app.query_one(_ComponentWidget)
+        assert widget.get_component_styles("my--part").display == "none"
+
+
+async def test_component_styles_node_is_usable() -> None:
+    """Test that the node behind component styles answers public DOM queries like a detached node."""
+    app = _ComponentApp()
+    async with app.run_test():
+        node = app.query_one(_ComponentWidget).get_component_styles("my--part").node
+        assert node is not None
+        assert (list(node.children), node.message_signal is node.message_signal) == ([], True)

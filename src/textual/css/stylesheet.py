@@ -23,7 +23,7 @@ from textual.css.styles import RulesMap, Styles
 from textual.css.tokenize import Token, tokenize_values
 from textual.css.tokenizer import TokenError
 from textual.css.types import CSSLocation, Specificity3, Specificity6
-from textual.dom import DOMNode
+from textual.dom import DOMNode, _ComponentNode
 from textual.markup import parse_style
 from textual.style import Style
 from textual.widget import Widget
@@ -621,7 +621,7 @@ class Stylesheet:
             old_component_styles = node._component_styles.copy()
             node._component_styles.clear()
             for component in sorted(component_classes):
-                virtual_node = DOMNode(classes=component)
+                virtual_node = _ComponentNode(component)
                 virtual_node._attach(node)
                 self.apply(virtual_node, animate=False)
                 if (
