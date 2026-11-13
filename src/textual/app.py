@@ -3467,7 +3467,8 @@ class App(Generic[ReturnType], DOMNode):
                 try:
                     await self.animator.stop()
                 finally:
-                    await Timer._stop_all(self._timers)
+                    if self._timers is not None:
+                        await Timer._stop_all(self._timers)
 
         with self._context():
             if not await app_prelude():

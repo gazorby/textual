@@ -120,10 +120,10 @@ class MessagePump(metaclass=_MessagePumpMeta):
         self._running: bool = False
         self._closing: bool = False
         self._closed: bool = False
-        self._disabled_messages: set[type[Message]] = set()
+        self._disabled_messages: set[type[Message]] | None = None
         self._pending_message: Message | None = None
         self._task: Task | None = None
-        self._timers: WeakSet[Timer] = WeakSet()
+        self._timers: WeakSet[Timer] | None = None
         self._last_idle: float = time()
         self._max_idle: float | None = None
         self._is_mounted = False
@@ -322,15 +322,21 @@ class MessagePump(metaclass=_MessagePumpMeta):
             `True` if the message will be sent, or `False` if it is disabled.
         """
 
-        return type(message) not in self._disabled_messages
+        return (
+            self._disabled_messages is None
+            or type(message) not in self._disabled_messages
+        )
 
     def disable_messages(self, *messages: type[Message]) -> None:
         """Disable message types from being processed."""
+        if self._disabled_messages is None:
+            self._disabled_messages = set()
         self._disabled_messages.update(messages)
 
     def enable_messages(self, *messages: type[Message]) -> None:
         """Enable processing of messages types."""
-        self._disabled_messages.difference_update(messages)
+        if self._disabled_messages is not None:
+            self._disabled_messages.difference_update(messages)
 
     async def _get_message(self) -> Message:
         """Get the next event on the queue, or None if queue is closed.
@@ -412,8 +418,13 @@ class MessagePump(metaclass=_MessagePumpMeta):
             pause=pause,
         )
         timer._start()
-        self._timers.add(timer)
+        self._track_timer(timer)
         return timer
+
+    def _track_timer(self, timer: Timer) -> None:
+        if self._timers is None:
+            self._timers = WeakSet()
+        self._timers.add(timer)
 
     def set_interval(
         self,
@@ -445,7 +456,7 @@ class MessagePump(metaclass=_MessagePumpMeta):
             pause=pause,
         )
         timer._start()
-        self._timers.add(timer)
+        self._track_timer(timer)
         return timer
 
     def call_after_refresh(self, callback: Callback, *args: Any, **kwargs: Any) -> bool:

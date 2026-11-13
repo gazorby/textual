@@ -190,3 +190,42 @@ async def test_thread_safe_post_message():
 
     async with app.run_test() as pilot:
         await pilot.pause()
+
+
+class _Ping(Message):
+    pass
+
+
+async def test_enable_messages_before_disable() -> None:
+    """Test that enabling a message type on a pump that never disabled any keeps it enabled."""
+    widget = Widget()
+    widget.enable_messages(_Ping)
+    assert widget.check_message_enabled(_Ping()) is True
+
+
+async def test_disable_then_enable_messages() -> None:
+    """Test that a disabled message type is blocked until it is enabled again."""
+    widget = Widget()
+    widget.disable_messages(_Ping)
+    blocked = widget.check_message_enabled(_Ping())
+    widget.enable_messages(_Ping)
+    assert (blocked, widget.check_message_enabled(_Ping())) == (False, True)
+
+
+async def test_interval_stops_when_widget_removed() -> None:
+    """Test that an interval set on a widget stops firing once the widget is removed."""
+    ticks: list[None] = []
+
+    class TimerApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Label("tick")
+
+    app = TimerApp()
+    async with app.run_test() as pilot:
+        label = app.query_one(Label)
+        label.set_interval(0.01, lambda: ticks.append(None))
+        await pilot.pause(0.05)
+        await label.remove()
+        count = len(ticks)
+        await pilot.pause(0.05)
+        assert count > 0 and len(ticks) == count
