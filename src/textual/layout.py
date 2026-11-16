@@ -30,6 +30,7 @@ class DockArrangeResult:
 
     _spatial_map: SpatialMap[WidgetPlacement] | None = None
     """A Spatial map to query widget placements."""
+    _total_region: Region | None = None
 
     @property
     def spatial_map(self) -> SpatialMap[WidgetPlacement]:
@@ -56,8 +57,15 @@ class DockArrangeResult:
         Returns:
             A Region.
         """
-        _top, right, bottom, _left = self.scroll_spacing
-        return self.spatial_map.total_region.grow((0, right, bottom, 0))
+        if self._total_region is None:
+            # Same union as the spatial map's, without building its grid.
+            total = Region()
+            for placement in self.placements:
+                if not (placement.fixed or placement.overlay):
+                    total = total.union(placement.region.grow(placement.margin))
+            _top, right, bottom, _left = self.scroll_spacing
+            self._total_region = total.grow((0, right, bottom, 0))
+        return self._total_region
 
     def get_visible_placements(self, region: Region) -> list[WidgetPlacement]:
         """Get the placements visible within the given region.
