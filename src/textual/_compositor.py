@@ -396,6 +396,7 @@ class Compositor:
 
         # Replace map and widgets
         self._full_map = map
+        self._full_map_invalidated = False
         self.widgets = widgets
 
         # Contains widgets + geometry for every widget that changed (added, removed, or updated)
