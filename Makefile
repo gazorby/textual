@@ -4,6 +4,10 @@ run := poetry run
 test:
 	$(run) pytest tests/ -n 16 --dist=loadgroup $(ARGS)
 
+.PHONY: benchmark
+benchmark:
+	$(run) python tools/benchmark.py $(ARGS)
+
 .PHONY: testv
 testv:
 	$(run) pytest tests/ -vvv -n 16 --dist=loadgroup $(ARGS)
