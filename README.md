@@ -1,3 +1,42 @@
+## About this fork
+
+This is [Textual](https://github.com/Textualize/textual) 8.2.8 with work on speed and memory: fewer objects per widget, leaks fixed when widgets are removed, less layout work, and linear-time removal of `Tree` nodes and `DataTable` rows. The public API is the same as upstream's, apart from the `__slots__` caveat under [Compatibility](#compatibility).
+
+### Measured gains
+
+Upstream Textual 8.2.8 against this fork, each measurement in a fresh interpreter. Timings are the median of 5 runs after one warm-up run; memory figures are from one run.
+
+| Workload | 3.12 upstream | 3.12 fork | 3.12 change | 3.14 upstream | 3.14 fork | 3.14 change |
+|---|---:|---:|---:|---:|---:|---:|
+| Demo app, traced memory (MB) | 24.7 MB | 21.8 MB | -11.7% | 27.9 MB | 25.1 MB | -10.0% |
+| Demo app, peak RSS (MB) | 61.6 MB | 56.1 MB | -8.9% | 64.6 MB | 59.9 MB | -7.3% |
+| Widget churn, retained memory (MB) | 4.2 MB | 0.2 MB | -95.7% | 4.1 MB | 0.1 MB | -98.2% |
+| Startup to first frame (ms) | 98.8 ms | 89.0 ms | -9.9% | 91.0 ms | 87.8 ms | -3.5% |
+| Resize, 2,000 widgets (ms) | 334.9 ms | 309.2 ms | -7.7% | 332.9 ms | 309.8 ms | -6.9% |
+| Tree, remove 10,000 nodes (ms) | 269.2 ms | 23.7 ms | -91.2% | 299.2 ms | 23.5 ms | -92.2% |
+| DataTable, remove 10,000 rows (ms) | 17251.6 ms | 80.5 ms | -99.5% | 19164.1 ms | 86.1 ms | -99.6% |
+
+Apple M4, 16 GB, macOS 27.2.1, CPython 3.12.11 and 3.14.0. The tree workload removes 10,000 leaves from a single node; "widget churn" is memory still held after mounting and removing 1,000 widgets 20 times. Reproduce with `python3 tools/benchmark.py` (needs [uv](https://docs.astral.sh/uv/), nothing else); the workloads are in [`tools/benchmark.py`](tools/benchmark.py).
+
+### Which Python versions
+
+Gains can differ by Python version, so the table shows two. 3.14 is the newest stable release, the one this fork is tuned on, and the only one where `Styles` is slotted. 3.12 was expected to gain less, because from 3.12 CPython already stores most instance attributes compactly, so `__slots__` saves only about 16–32 bytes per object.
+
+The measurements do not bear that out: on 3.12 memory is 9–12% lower and resize 8% faster, against 7–10% and 7% on 3.14. Startup is 10% faster on 3.12 but only 3.5% on 3.14, too small a gain to tell apart from run-to-run variation, which the table does not show. The leak and removal fixes cut retained memory and removal time by 91% or more on both. Python 3.9–3.11 are supported but not measured.
+
+### Compatibility
+
+`RenderStyles`, `Signal`, `BindingsMap` and `NodeList` (and `Styles` on Python 3.14+) use `__slots__`, so they no longer accept arbitrary attributes. Code that sets its own attributes on them will raise `AttributeError`. Everything else is meant to behave exactly like upstream.
+
+### Install
+
+There is no PyPI release. Install from this repository:
+
+```bash
+pip install git+https://github.com/gazorby/textual@next
+```
+
+---
 
 
 [![Discord](https://img.shields.io/discord/1026214085173461072)](https://discord.gg/Enf6Z3qhVr)
